@@ -111,6 +111,7 @@ h1 {
 }
 
 .footer a {
+    font-weight: bold;
     color: var(--main-color);
 }
 
