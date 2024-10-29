@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Network Monitoring Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash/lodash.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment/min/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment-duration-format/lib/moment-duration-format.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-streaming"></script>
+    <viewpoint content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <link href="https://unpkg.com/boxicons@2.1.1/css/boxicons.min.css" rel="stylesheet">   
+</head>
+<body>
+    <h1>Network Monitoring Dashboard</h1>
+    <div id="summaryContainer">
+        <h2>Network Health Summary</h2>
+        <table class="summaryTable">
+            <thead>
+                <tr>
+                    <th>Server IP</th>
+                    <th>Uptime (%)</th>
+                    <th> Alert Count</th>
+                </tr>
+            </thead>
+            <tbody id="summaryBody">
+                <!-- Summary rows will be added here dynamically -->
+            </tbody>
+        </table>
+    </div>
+    <div class="button-container">
+        <button class="button" onclick="startMonitoring()">Start Monitoring</button>
+        <button class="button" onclick="stopMonitoring()">Stop Monitoring</button>
+    </div>
+
+    <input class="input-field" type="text" id="serverInput" placeholder="Enter server IP">
+
+    <div id="chartsContainer"></div>
+    <audio id="alertSound" src="{{ url_for('static', filename='alert-sound.mp3') }}" preload="auto"></audio> <!-- Optional sound alert -->
+    <div id="result"></div>
+    <!-- <div class=maps id="map" style="height: 200px; width: 30%;"></div> -->
+    <!-- <canvas id="latencyChart" width="500" height="200"></canvas> -->
+     <!-- Chat Interface -->
+    <!-- Chatbot Button and Chat Window -->
+    <div id="chat-icon" onclick="toggleChat()">
+        <i class="bx bx-chat"></i>
+    </div>
+
+    <div id="chat-container" style="display: none;">
+        <div id="chat-box">
+            <div id="messages">
+                <!-- Greeting message will be added by JavaScript -->
+            </div>
+            <input type="text" id="user-input" placeholder="Type your message...">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+
+    <button id="scrollToTopBtn" onclick="scrollToTop()" title="Go to top">
+        <i class='bx bxs-upvote'></i>
+    </button>
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+    <footer class="footer">
+        <p>Created by <a href="https://eboakye.me/">Ebenezer Boakye</a></p>
+    </footer>
+</body>
+</html>
