@@ -206,7 +206,7 @@ async function startMonitoring() {
 
     monitoringIntervals[server] = setInterval(async () => {
         try {
-            const response = await fetch(`http://127.0.0.1:5000/check?server=${server}`);
+            const response = await fetch(`https://netdash.onrender.com/check?server=${server}`);
             const data = await response.json();
 
             const latency = data.is_up ? data.latency : 0; // Set latency to 0 if server is down
@@ -248,7 +248,7 @@ function stopMonitoring(server) {
 
 async function fetchLocationData(ip) {
     try {
-        const response = await fetch(`http://127.0.0.1:5000/validate_ip?ip=${ip}`);
+        const response = await fetch(`https://netdash.onrender.com/validate_ip?ip=${ip}`);
         const data = await response.json();
         if (data.error) {
             alert(data.error); // Show error message if IP is invalid
