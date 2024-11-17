@@ -111,24 +111,27 @@ client = openai
 def get_it_support_response(user_message):
     try:
         response = client.chat.completions.create(
-            model="gpt-4",  # or "gpt-4" if available
+            model="gpt-4o",  # or "gpt-3.5-turbo" if GPT-4 is not available
             messages=[
-                {"role": "system", "content": "You are a helpful IT support assistant. Answer user questions in simple, easy-to-understand terms."},
+                {"role": "system", "content": "You are a helpful IT support assistant. Answer user questions in simple, easy-to-understand terms. Only respond to IT-related queries. If the question is not IT-related, politely inform the user that you can only assist with IT issues."},
                 {"role": "user", "content": user_message}
             ],
-            max_tokens=150,
-            temperature=0.7
+            max_tokens=100,
+            temperature=0.2
         )
-        bot_response = response['choices'][0]['message']['content'].strip()
+        bot_response = response.choices[0].message.content.strip()
         return bot_response
     except Exception as e:
-        # Handle exceptions (e.g., API errors)
-        return "Sorry, I'm having trouble processing your request right now."
+        print(f"Error in OpenAI API call: {str(e)}")
+        return "Sorry, I'm having trouble processing your request right now. Please try again later."
     
 # Route for handling chatbot messages
 @app.route('/chat', methods=['POST'])
 def chat():
     user_message = request.json.get("message")
+    if not user_message:
+        return jsonify({"error": "No message provided"}), 400
+
     bot_response = get_it_support_response(user_message)
     return jsonify({"response": bot_response})
 

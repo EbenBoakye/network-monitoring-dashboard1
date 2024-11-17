@@ -17,16 +17,16 @@ body {
     background-attachment: fixed;
     color: white;
 }
-.maps{
+.maps {
     display: flex;
-    margin-left: 656px;
-    margin-right: 656px;
-    margin-top: 5px;
+    margin: 5px auto 0;
     justify-content: center;
     align-items: center;
     height: 100vh;
     width: 100%;
+    max-width: 1312px; /* Ensures it doesn't exceed the original width on larger screens */
 }
+
 
 h1 {
     margin-top: 6rem;
@@ -257,6 +257,10 @@ h1 {
     color: white;
     padding: 8px;
     border-radius: 5px;
+    margin-left: 10px; 
+    max-width: 200px; /* Limit the width of the message */
+    word-wrap: break-word; /* Break long words to the next line */
+    margin-bottom: 1.5rem;
 }
 
 .bot-message {
@@ -264,6 +268,7 @@ h1 {
     background-color: var(--main-color);
     padding: 8px;
     border-radius: 5px;
+    margin-bottom: 1.5rem;
 }
 
 #user-input {
@@ -272,6 +277,9 @@ h1 {
     border: 1px solid #ccc;
     border-radius: 5px;
     margin-top: 10px;
+    resize: vertical; /* Allows the user to resize the input vertically */
+    overflow: auto; /* Ensures content is scrollable if it overflows */
+    min-height: 40px; /* Sets a minimum height for the input */
 }
 
 button {

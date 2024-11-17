@@ -194,56 +194,12 @@ async function startMonitoring() {
     }
     // Fetch and display location data
     const locationData = await fetchLocationData(server);
-    if (!locationData) return; // Exit if IP validation fails
 
     initializeCharts(server);
 
      // Display location info in the chart container
      const chartContainer = document.getElementById(`chart-${server}`);
      const locationInfo = document.createElement('p');
-     locationInfo.innerText = `Location: ${locationData.city || "Unknown"}, ${locationData.region || "Unknown"}, ${locationData.country || "Unknown"}`;
-     chartContainer.prepend(locationInfo);
-
-    monitoringIntervals[server] = setInterval(async () => {
-        try {
-            const response = await fetch(`https://netdash.onrender.com/check?server=${server}`);
-            const data = await response.json();
-
-            const latency = data.is_up ? data.latency : 0; // Set latency to 0 if server is down
-            updateLineChart(server, latency);
-        } catch (error) {
-            console.error("Error fetching data:", error);
-            updateLineChart(server, 0); // Set latency to 0 if there's a fetch error
-        }
-    }, 1600); // Fetch data every 2~ seconds
-}
-
-// Stop monitoring a specific server or all servers if none specified
-function stopMonitoring(server) {
-    if (server && monitoringIntervals[server]) {
-        clearInterval(monitoringIntervals[server]);
-        delete monitoringIntervals[server];
-
-        // Remove charts from page
-        const chartDiv = document.getElementById(`chart-${server}`);
-        if (chartDiv) chartDiv.remove();
-        delete charts[server];
-        delete statsCharts[server];
-        delete latencyStats[server];
-        delete thresholds[server];
-    } else if (!server) {
-        Object.keys(monitoringIntervals).forEach(server => {
-            clearInterval(monitoringIntervals[server]);
-            delete monitoringIntervals[server];
-
-            const chartDiv = document.getElementById(`chart-${server}`);
-            if (chartDiv) chartDiv.remove();
-            delete charts[server];
-            delete statsCharts[server];
-            delete latencyStats[server];
-            delete thresholds[server];
-        });
-    }
 }
 
 async function fetchLocationData(ip) {
@@ -301,32 +257,6 @@ function displaySummary() {
         `;
         summaryBody.appendChild(row);
     });
-}
-
-// Update alert count in checkThreshold function
-function checkThreshold(server, latency) {
-    const thresholdInput = document.getElementById(`threshold-${server}`);
-    const alertMessage = document.getElementById(`alert-${server}`);
-    const threshold = parseFloat(thresholdInput.value);
-
-    if (threshold && latency > threshold) {
-        alertMessage.style.display = "block";
-        charts[server].data.datasets[0].borderColor = 'rgba(255, 99, 132, 1)';
-        charts[server].update();
-
-        // Increment alert count
-        if (!summaryData[server]) {
-            summaryData[server] = { upTimeCount: 0, downTimeCount: 0, alertCount: 0 };
-        }
-        summaryData[server].alertCount += 1;
-
-        // Play the alert sound using the Web Audio API
-        playAlertSound();
-    } else {
-        alertMessage.style.display = "none";
-        charts[server].data.datasets[0].borderColor = 'rgba(75, 192, 192, 1)';
-        charts[server].update();
-    }
 }
 
 // Call updateSummaryData in updateLineChart function to track uptime
@@ -430,7 +360,9 @@ function toggleChat() {
 }
 
 function sendMessage() {
-    const userInput = document.getElementById("user-input").value;
+    const userInput = document.getElementById("user-input").value.trim(); // Trim whitespace
+    if (userInput === '') return; // Prevent sending empty or whitespace-only messages
+
     document.getElementById("messages").innerHTML += `<div class="user-message">${userInput}</div>`;
     document.getElementById("user-input").value = '';
 
@@ -446,4 +378,10 @@ function sendMessage() {
     .catch(error => console.error("Error:", error));
 }
 
-    
+// Add event listener for Enter key
+document.getElementById("user-input").addEventListener("keyup", function(event) {
+    if (event.key === "Enter") {
+        event.preventDefault(); // Prevent default form submission
+        sendMessage();
+    }
+});

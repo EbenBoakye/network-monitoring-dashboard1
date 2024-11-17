@@ -42,9 +42,9 @@
     <div id="chartsContainer"></div>
     <audio id="alertSound" src="{{ url_for('static', filename='alert-sound.mp3') }}" preload="auto"></audio> <!-- Optional sound alert -->
     <div id="result"></div>
-    <!-- <div class=maps id="map" style="height: 200px; width: 30%;"></div> -->
-    <!-- <canvas id="latencyChart" width="500" height="200"></canvas> -->
-     <!-- Chat Interface -->
+    <div class=maps id="map" style="height: 200px; width: 30%;"></div> 
+    <!-- <canvas id="latencyChart" width="500" height="200"></canvas>
+     <! Chat Interface -->
     <!-- Chatbot Button and Chat Window -->
     <div id="chat-icon" onclick="toggleChat()">
         <i class="bx bx-chat"></i>
@@ -59,6 +59,7 @@
             <button onclick="sendMessage()">Send</button>
         </div>
     </div>
+
 
 
     <button id="scrollToTopBtn" onclick="scrollToTop()" title="Go to top">
