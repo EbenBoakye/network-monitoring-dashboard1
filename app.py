@@ -12,23 +12,32 @@ load_dotenv()
 IPINFO_TOKEN = os.getenv('IPINFO_TOKEN')
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+# Optional: Warn if IPINFO_TOKEN is missing
 if IPINFO_TOKEN is None:
     print("Warning: IPINFO_TOKEN is not set. Make sure it's defined in the .env file.")
 
 app = Flask(
     __name__,
-    static_folder=os.path.join('backend', 'static'),  # Corrected path
-    template_folder='templates'
+    static_folder='backend/static',  # where your JS and other static files reside
+    template_folder='templates'      # for your .html templates
 )
-CORS(app)  # Enable CORS for development
+CORS(app)  # Enable CORS during development
 
 @app.route('/')
 def home():
+    """
+    Render the main page (index.html).
+    """
     return render_template('index.html')
 
-# Route to check server status
+
+# ------------------- Network Checking Endpoint ------------------- #
 @app.route('/check', methods=['GET'])
 def check():
+    """
+    /check?server=1.1.1.1
+    Calls check_server to measure latency/status and return as JSON.
+    """
     server_ip = request.args.get('server')
     if not server_ip:
         return jsonify({"error": "No server IP provided"}), 400
@@ -36,28 +45,47 @@ def check():
     network_status = check_server(server_ip)
     return jsonify(network_status.to_dict())
 
-# Function to validate IP address
+
+# ------------------- IP Validation + Geolocation ------------------- #
+
 def validate_ip(ip):
+    """
+    Validate the IP using ipaddress (standard library).
+    """
     try:
         ipaddress.ip_address(ip)
         return True
     except ValueError:
         return False
 
-# Function to get geolocation data with error handling
 def get_geolocation(ip):
+    """
+    Fetch geolocation data from ipinfo.io using your IPINFO_TOKEN.
+    Parse out latitude, longitude from 'loc' if present.
+    """
     url = f"https://ipinfo.io/{ip}?token={IPINFO_TOKEN}"
     try:
         response = requests.get(url)
-        response.raise_for_status()  # This will raise an HTTPError for bad responses
-        return response.json()
+        response.raise_for_status()
+        data = response.json()
+
+        # If 'loc' in data, parse out lat/long
+        if 'loc' in data:
+            lat, lon = data['loc'].split(',')
+            data['latitude'] = lat
+            data['longitude'] = lon
+
+        return data
     except requests.exceptions.RequestException as e:
         print(f"Error fetching geolocation data for IP {ip}: {e}")
         return None
 
-# Route to validate IP and get location data
 @app.route('/validate_ip', methods=['GET'])
 def validate_and_locate_ip():
+    """
+    /validate_ip?ip=8.8.8.8
+    Validates the IP and returns geolocation data if valid.
+    """
     ip = request.args.get('ip')
     if not ip or not validate_ip(ip):
         return jsonify({"error": "Invalid IP address"}), 400
@@ -67,53 +95,47 @@ def validate_and_locate_ip():
         return jsonify(location_data)
     else:
         return jsonify({"error": "Could not retrieve location data"}), 500
-    
 
 
-def get_geolocation(ip):
-    url = f"https://ipinfo.io/{ip}?token={IPINFO_TOKEN}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
-        if 'loc' in data:
-            latitude, longitude = data['loc'].split(',')
-            data['latitude'] = latitude
-            data['longitude'] = longitude
-        return data
-    else:
-        return None
-
+# ------------------- Return Basic Server Data for Map ------------------- #
 
 @app.route('/server_data', methods=['GET'])
 def get_server_data():
-    # List of server IPs you want to monitor
-    ips_to_monitor =[{ip}] # Add actual IPs here
+    """
+    Returns a list of servers with lat, long, etc. for the Leaflet map.
+    """
+    # List of server IPs you want to display on the map
+    ips_to_monitor = ["8.8.8.8", "1.1.1.1"]  # adjust as needed
 
     servers = []
     for ip in ips_to_monitor:
         location_data = get_geolocation(ip)
-        if location_data:
+        # Only add if we got valid location info
+        if location_data and "latitude" in location_data and "longitude" in location_data:
             servers.append({
                 "ip": ip,
                 "latitude": location_data["latitude"],
                 "longitude": location_data["longitude"],
-                "latency": 20,   # Replace with actual latency if available
-                "uptime": 99.9,  # Replace with actual uptime if available
-                "alertCount": 2  # Replace with actual alert count if available
+                "latency": 20,    # placeholder
+                "uptime": 99.9,   # placeholder
+                "alertCount": 2   # placeholder
             })
 
     return jsonify(servers)
 
-# Initialize OpenAI API client
+
+# ------------------- OpenAI Chatbot Endpoint ------------------- #
 client = openai
 
-# Function to interact with OpenAI API for IT support chatbot responses
 def get_it_support_response(user_message):
+    """
+    Use OpenAI's Chat Completions to respond to user messages.
+    """
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o",  # or "gpt-3.5-turbo" if GPT-4 is not available
+        response = client.ChatCompletion.create(
+            model="gpt-3.5-turbo",  # or "gpt-4" if you have access
             messages=[
-                {"role": "system", "content": "You are a helpful IT support assistant. Answer user questions in simple, easy-to-understand terms. Only respond to IT-related queries. If the question is not IT-related, politely inform the user that you can only assist with IT issues."},
+                {"role": "system", "content": "You are a helpful IT support assistant..."},
                 {"role": "user", "content": user_message}
             ],
             max_tokens=100,
@@ -123,11 +145,14 @@ def get_it_support_response(user_message):
         return bot_response
     except Exception as e:
         print(f"Error in OpenAI API call: {str(e)}")
-        return "Sorry, I'm having trouble processing your request right now. Please try again later."
-    
-# Route for handling chatbot messages
+        return "Sorry, I'm having trouble processing your request right now."
+
 @app.route('/chat', methods=['POST'])
 def chat():
+    """
+    Expects JSON: { message: "User's message" }
+    Returns JSON: { response: "Bot's response" }
+    """
     user_message = request.json.get("message")
     if not user_message:
         return jsonify({"error": "No message provided"}), 400
@@ -135,5 +160,7 @@ def chat():
     bot_response = get_it_support_response(user_message)
     return jsonify({"response": bot_response})
 
+
+# ------------------- Run the Flask App ------------------- #
 # if __name__ == '__main__':
 #     app.run(debug=True, port=5000)

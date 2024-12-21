@@ -1,13 +1,13 @@
+// Global variables
 let monitoringIntervals = {}; // Stores intervals for each server
 let charts = {}; // Stores line chart instances for each server
 let statsCharts = {}; // Stores bar chart instances for each server
 let latencyStats = {}; // Stores latency data for computing max, min, avg
-let thresholds = {}; // Stores latency thresholds for each server
+let summaryData = {}; // Stores uptime and alert count data for each server
 
 // Initialize a new line and bar chart for each server
 function initializeCharts(server) {
     const container = document.getElementById('chartsContainer');
-
     // Create a new div for each server's charts
     const chartDiv = document.createElement('div');
     chartDiv.id = `chart-${server}`;
@@ -19,12 +19,14 @@ function initializeCharts(server) {
                 <canvas id="latencyChart-${server}" width="400" height="200"></canvas>
                 <canvas id="statsChart-${server}" width="200" height="200"></canvas>
             </div>
-            <input type="number" id="threshold-${server}" placeholder="Set Latency Threshold">
-        <p id="alert-${server}" class="alert-message" style="display:none; color: red;">Threshold Exceeded!</p>
-        </div>`;
-        
+            <input type="number" id="threshold-${server}" placeholder="Set Latency Threshold" />
+            <p id="alert-${server}" class="alert-message" style="display:none;">Threshold Exceeded!</p>
+        </div>
+    `;
+
     container.appendChild(chartDiv);
 
+    // Initialize the line chart
     const ctxLine = document.getElementById(`latencyChart-${server}`).getContext('2d');
     charts[server] = new Chart(ctxLine, {
         type: 'line',
@@ -46,6 +48,7 @@ function initializeCharts(server) {
         }
     });
 
+    // Initialize the bar chart
     const ctxBar = document.getElementById(`statsChart-${server}`).getContext('2d');
     statsCharts[server] = new Chart(ctxBar, {
         type: 'bar',
@@ -86,9 +89,12 @@ function updateLineChart(server, latency) {
 
     // Track latency values for stats calculations
     updateStats(server, latency, timestamp);
-     // Check if latency exceeds threshold
+
+    // Check if latency exceeds threshold
     checkThreshold(server, latency);
-    
+
+    // Update summary data
+    updateSummaryData(server, latency);
 }
 
 // Update bar chart with max, min, and average latencies
@@ -125,6 +131,7 @@ function updateStats(server, latency, timestamp) {
     updateStatsChart(server);
 }
 
+// Check threshold and show alert
 function checkThreshold(server, latency) {
     const thresholdInput = document.getElementById(`threshold-${server}`);
     const alertMessage = document.getElementById(`alert-${server}`);
@@ -144,7 +151,7 @@ function checkThreshold(server, latency) {
     }
 }
 
-
+// Audio setup
 let audioContext;
 let alertBuffer;
 
@@ -153,6 +160,7 @@ async function initializeAudio() {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
     try {
+        // Make sure you actually have alert-sound.mp3 in /static
         const response = await fetch('/static/alert-sound.mp3');
         const arrayBuffer = await response.arrayBuffer();
         alertBuffer = await audioContext.decodeAudioData(arrayBuffer);
@@ -171,40 +179,23 @@ function playAlertSound() {
     }
 }
 
-// Call this function once on a user interaction to unlock the audio context
+// Unlock the audio context on user interaction
 document.addEventListener('click', () => {
     if (audioContext && audioContext.state === 'suspended') {
         audioContext.resume();
     }
 }, { once: true });
 
-// Call `initializeAudio()` when the page loads
+// Call initializeAudio when the page loads
 window.onload = initializeAudio;
 
-// Start monitoring a server
-async function startMonitoring() {
-    const server = document.getElementById("serverInput").value;
-    if (!server) {
-        alert("Please enter a server IP");
-        return;
-    }
-    if (monitoringIntervals[server]) {
-        alert("Already monitoring this server");
-        return;
-    }
-    // Fetch and display location data
-    const locationData = await fetchLocationData(server);
 
-    initializeCharts(server);
+// ------------- Monitoring Logic ------------- //
 
-     // Display location info in the chart container
-     const chartContainer = document.getElementById(`chart-${server}`);
-     const locationInfo = document.createElement('p');
-}
-
+// Function to fetch location data (used in startMonitoring)
 async function fetchLocationData(ip) {
     try {
-        const response = await fetch(`https://netdash.onrender.com/validate_ip?ip=${ip}`);
+        const response = await fetch(`/validate_ip?ip=${ip}`);
         const data = await response.json();
         if (data.error) {
             alert(data.error); // Show error message if IP is invalid
@@ -217,23 +208,64 @@ async function fetchLocationData(ip) {
     }
 }
 
+// A function to fetch the real-time latency from /check
+async function getLatencyForServer(server) {
+    const response = await fetch(`/check?server=${server}`);
+    const data = await response.json();
+    // Suppose data has {"ip":..., "status":..., "latency":...}
+    return data.latency;
+}
 
-let summaryData = {}; // Object to store uptime and alert count data for each server
+// Start monitoring a server
+async function startMonitoring() {
+    const server = document.getElementById("serverInput").value;
+    if (!server) {
+        alert("Please enter a server IP");
+        return;
+    }
+    if (monitoringIntervals[server]) {
+        alert("Already monitoring this server");
+        return;
+    }
+
+    // Fetch and display location data to validate server IP
+    const locationData = await fetchLocationData(server);
+    if (!locationData) {
+        return; // If IP invalid, stop
+    }
+
+    // Initialize the charts for this server
+    initializeCharts(server);
+
+    // Set an interval to fetch latency every 5 seconds and update the chart
+    monitoringIntervals[server] = setInterval(async () => {
+        try {
+            const latency = await getLatencyForServer(server);
+            updateLineChart(server, latency);
+        } catch (err) {
+            console.error(`Error updating latency for ${server}:`, err);
+        }
+    }, 2000);
+}
+
+
+// ------------- Summary Logic ------------- //
 
 // Update summary data for a server
 function updateSummaryData(server, latency) {
     if (!summaryData[server]) {
         summaryData[server] = { upTimeCount: 0, downTimeCount: 0, alertCount: 0 };
     }
-
     const summary = summaryData[server];
 
-    // Increment uptime or downtime count based on latency
+    // Arbitrary rule: if latency > 0, consider server "up"
     if (latency > 0) {
         summary.upTimeCount += 1;
     } else {
         summary.downTimeCount += 1;
     }
+
+    // You could track threshold alerts similarly, or increment alertCount in checkThreshold
 
     // Update the summary table
     displaySummary();
@@ -259,32 +291,8 @@ function displaySummary() {
     });
 }
 
-// Call updateSummaryData in updateLineChart function to track uptime
-function updateLineChart(server, latency) {
-    const timestamp = new Date().toLocaleTimeString();
-    const chart = charts[server];
 
-    chart.data.labels.push(timestamp);
-    chart.data.datasets[0].data.push(latency);
-
-    // Limit the number of data points displayed
-    if (chart.data.labels.length > 10) {
-        chart.data.labels.shift();
-        chart.data.datasets[0].data.shift();
-    }
-
-    chart.update();
-
-    // Track latency values for stats calculations
-    updateStats(server, latency, timestamp);
-
-    // Check if latency exceeds threshold
-    checkThreshold(server, latency);
-
-    // Update summary data
-    updateSummaryData(server, latency);
-}
-// Show or hide the scroll-to-top button based on scroll position
+// ------------- Scroll to Top ------------- //
 window.onscroll = function() {
     const scrollToTopBtn = document.getElementById("scrollToTopBtn");
     if (document.body.scrollTop > 200 || document.documentElement.scrollTop > 200) {
@@ -294,7 +302,6 @@ window.onscroll = function() {
     }
 };
 
-// Smoothly scroll to the top when the button is clicked
 function scrollToTop() {
     window.scrollTo({
         top: 0,
@@ -303,19 +310,17 @@ function scrollToTop() {
 }
 
 
-// Initialize the map
+// ------------- Map Setup ------------- //
 const map = L.map('map').setView([20, 0], 2); // Center at an approximate global position
 
 // Add a tile layer to the map
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+attribution: `&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors`
 }).addTo(map);
 
 // Function to add a marker for each server
 function addServerMarker(server, latitude, longitude, latency, uptime, alertCount) {
     const marker = L.marker([latitude, longitude]).addTo(map);
-
-    // Create the popup content
     const popupContent = `
         <strong>Server: ${server}</strong><br>
         Latency: ${latency} ms<br>
@@ -325,6 +330,7 @@ function addServerMarker(server, latitude, longitude, latency, uptime, alertCoun
     marker.bindPopup(popupContent);
 }
 
+// Fetch server data for the map
 fetch('/server_data')
     .then(response => response.json())
     .then(data => {
@@ -332,8 +338,8 @@ fetch('/server_data')
             console.log(`Server ${server.ip}: Lat ${server.latitude}, Lon ${server.longitude}`);
             addServerMarker(
                 server.ip,
-                parseFloat(server.latitude), // Ensure latitude is a number
-                parseFloat(server.longitude), // Ensure longitude is a number
+                parseFloat(server.latitude),
+                parseFloat(server.longitude),
                 server.latency,
                 server.uptime,
                 server.alertCount
@@ -342,15 +348,15 @@ fetch('/server_data')
     })
     .catch(error => console.error("Error fetching server data:", error));
 
-   // Toggle chat visibility
+
+// ------------- Chatbox ------------- //
 function toggleChat() {
     const chatContainer = document.getElementById("chat-container");
     const messages = document.getElementById("messages");
 
-    if (chatContainer.style.display === "none") {
+    if (chatContainer.style.display === "none" || chatContainer.style.display === "") {
         chatContainer.style.display = "block";
-
-        // Add greeting message only if it's the first time opening
+        // Add greeting if first time
         if (!messages.innerHTML.includes("bot-message")) {
             messages.innerHTML += `<div class="bot-message">Hi, how can I help you today?</div>`;
         }
@@ -360,8 +366,8 @@ function toggleChat() {
 }
 
 function sendMessage() {
-    const userInput = document.getElementById("user-input").value.trim(); // Trim whitespace
-    if (userInput === '') return; // Prevent sending empty or whitespace-only messages
+    const userInput = document.getElementById("user-input").value.trim();
+    if (userInput === '') return;
 
     document.getElementById("messages").innerHTML += `<div class="user-message">${userInput}</div>`;
     document.getElementById("user-input").value = '';
@@ -378,10 +384,10 @@ function sendMessage() {
     .catch(error => console.error("Error:", error));
 }
 
-// Add event listener for Enter key
+// Enter key to send
 document.getElementById("user-input").addEventListener("keyup", function(event) {
     if (event.key === "Enter") {
-        event.preventDefault(); // Prevent default form submission
+        event.preventDefault();
         sendMessage();
     }
 });
