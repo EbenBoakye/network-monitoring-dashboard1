@@ -133,7 +133,7 @@ def get_it_support_response(user_message):
     """
     try:
         response = client.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # or "gpt-4" if you have access
+            model="gpt-4o",  # or "gpt-4" if you have access
             messages=[
                 {"role": "system", "content": "You are a helpful IT support assistant..."},
                 {"role": "user", "content": user_message}
